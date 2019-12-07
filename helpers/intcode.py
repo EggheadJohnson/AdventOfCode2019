@@ -1,10 +1,18 @@
 class intCodeComputer:
-    def __init__(self, operations, debugMode = False):
+    def __init__(self, operations, first_input = None, debugMode = False):
         self.operations = map(int, operations.split(','))
         self.error = None
         self.counter = 0
         self.debugMode = debugMode
-    def run(self):
+        self.array_of_inputs = []
+        if first_input:
+            self.array_of_inputs.append(first_input)
+        self.stopped = False
+    def run(self, array_of_inputs = None, pause_on_output = False):
+        if array_of_inputs:
+            self.array_of_inputs.extend(array_of_inputs)
+        self.pause_on_output = pause_on_output
+        self.stopped = False
         continueRunning = True
         while continueRunning:
             if self.debugMode:
@@ -14,7 +22,7 @@ class intCodeComputer:
             print self.error
             return False
         else:
-            return self.operations[0]
+            return self.output
     def nextAction(self):
         action, modes = self.parseNextAction()
         if self.debugMode:
@@ -36,7 +44,7 @@ class intCodeComputer:
         elif action == 4:
             self.retrieveValue(modes)
             self.counter += 2
-            return True
+            return self.pause_on_output
         elif action == 5:
             self.jumpIfTrue(modes)
             return True
@@ -78,7 +86,11 @@ class intCodeComputer:
         #     destination = self.operations[destination]
         self.operations[destination] = a * b
     def storeInput(self, modes):
-        userInput = input("Holding for user input: ")
+        # print self.array_of_inputs
+        if not self.array_of_inputs:
+            userInput = input("Holding for user input: ")
+        else:
+            userInput = self.array_of_inputs.pop(0)
         destination = self.operations[self.counter+1]
         # if modes[0] == 0:
         #     destination = self.operations[destination]
@@ -87,7 +99,8 @@ class intCodeComputer:
         destination = self.operations[self.counter+1]
         if modes[0] == 0:
             destination = self.operations[destination]
-        print destination
+        self.output = destination
+        # print destination
     def jumpIfTrue(self, modes):
         boolValue = self.operations[self.counter+1]
         jumpValue = self.operations[self.counter+2]
@@ -135,6 +148,7 @@ class intCodeComputer:
         #     destination = self.operations[destination]
         self.operations[destination] = int(a == b)
     def end(self):
+        self.stopped = True
         return False
     def invalidOpCode(self):
         self.error = "Invalid opcode " + str(self.operations[self.counter])
