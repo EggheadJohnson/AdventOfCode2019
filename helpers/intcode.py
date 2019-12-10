@@ -1,10 +1,13 @@
 class intCodeComputer:
-    def __init__(self, operations, first_input = None, debugMode = False):
+    def __init__(self, operations, first_input = None, debugMode = False, extend_to = 0):
         self.operations = map(int, operations.split(','))
+        self.extendTo(extend_to) # Start with 5000, if it OOB, make it bigger
         self.error = None
         self.counter = 0
         self.debugMode = debugMode
         self.array_of_inputs = []
+        self.relative_base = 0
+        self.output = None
         if first_input:
             self.array_of_inputs.append(first_input)
         self.stopped = False
@@ -26,7 +29,7 @@ class intCodeComputer:
     def nextAction(self):
         action, modes = self.parseNextAction()
         if self.debugMode:
-            print action, self.counter
+            print action, self.counter, modes
         if action == 1:
             # print "adding"
             self.add(modes)
@@ -43,8 +46,9 @@ class intCodeComputer:
             return True
         elif action == 4:
             self.retrieveValue(modes)
+            print self.output
             self.counter += 2
-            return self.pause_on_output
+            return not self.pause_on_output
         elif action == 5:
             self.jumpIfTrue(modes)
             return True
@@ -59,94 +63,61 @@ class intCodeComputer:
             self.equals(modes)
             self.counter += 4
             return True
+        elif action == 9:
+            self.adjust_relative_offset()
+            self.counter += 2
+            return True
         elif action == 99:
             return self.end()
         else:
             return self.invalidOpCode()
     def add(self, modes):
-        a = self.operations[self.counter+1]
-        b = self.operations[self.counter+2]
-        destination = self.operations[self.counter+3]
-        if modes[0] == 0:
-            a = self.operations[a]
-        if modes[1] == 0:
-            b = self.operations[b]
-        # if modes[2] == 0:
-        #     destination = self.operations[destination]
+        a, b = self.getParameters(2, modes)
+
+        destination = self.operations[self.counter + 3]
+
+        print modes, a, b, destination
+
         self.operations[destination] = a + b
     def mult(self, modes):
-        a = self.operations[self.counter+1]
-        b = self.operations[self.counter+2]
-        destination = self.operations[self.counter+3]
-        if modes[0] == 0:
-            a = self.operations[a]
-        if modes[1] == 0:
-            b = self.operations[b]
-        # if modes[2] == 0:
-        #     destination = self.operations[destination]
+        a, b = self.getParameters(2, modes)
+
+        destination = self.operations[self.counter + 3]
         self.operations[destination] = a * b
     def storeInput(self, modes):
-        # print self.array_of_inputs
         if not self.array_of_inputs:
             userInput = input("Holding for user input: ")
         else:
             userInput = self.array_of_inputs.pop(0)
-        destination = self.operations[self.counter+1]
+        destination = self.operations[self.counter + 1]
         # if modes[0] == 0:
         #     destination = self.operations[destination]
         self.operations[destination] = userInput
     def retrieveValue(self, modes):
-        destination = self.operations[self.counter+1]
-        if modes[0] == 0:
-            destination = self.operations[destination]
+        destination = self.getParameters(1, modes)[0]
         self.output = destination
         # print destination
     def jumpIfTrue(self, modes):
-        boolValue = self.operations[self.counter+1]
-        jumpValue = self.operations[self.counter+2]
-        if modes[0] == 0:
-            boolValue = self.operations[boolValue]
-        if modes[1] == 0:
-            jumpValue = self.operations[jumpValue]
+        boolValue, jumpValue = self.getParameters(2, modes)
         if boolValue != 0:
             self.counter = jumpValue
         else:
             self.counter += 3
     def jumpIfFalse(self, modes):
-        boolValue = self.operations[self.counter+1]
-        jumpValue = self.operations[self.counter+2]
-        if modes[0] == 0:
-            boolValue = self.operations[boolValue]
-        if modes[1] == 0:
-            jumpValue = self.operations[jumpValue]
+        boolValue, jumpValue = self.getParameters(2, modes)
         if boolValue == 0:
             self.counter = jumpValue
         else:
             self.counter += 3
     def lessThan(self, modes):
-        a = self.operations[self.counter+1]
-        b = self.operations[self.counter+2]
-        destination = self.operations[self.counter+3]
-        # print a, b, destination
-        if modes[0] == 0:
-            a = self.operations[a]
-        if modes[1] == 0:
-            b = self.operations[b]
-        # if modes[2] == 0:
-        #     destination = self.operations[destination]
-        # print a, b, destination
+        a, b, destination = self.getParameters(3, modes)
         self.operations[destination] = int(a < b)
     def equals(self, modes):
-        a = self.operations[self.counter+1]
-        b = self.operations[self.counter+2]
-        destination = self.operations[self.counter+3]
-        if modes[0] == 0:
-            a = self.operations[a]
-        if modes[1] == 0:
-            b = self.operations[b]
-        # if modes[2] == 0:
-        #     destination = self.operations[destination]
+        a, b, destination = self.getParameters(3, modes)
         self.operations[destination] = int(a == b)
+    def adjust_relative_offset(self):
+        adjustment = self.operations[self.counter + 1]
+        self.relative_base += adjustment
     def end(self):
         self.stopped = True
         return False
@@ -162,3 +133,27 @@ class intCodeComputer:
         modes = map(int, list(action[:3]))
         modes.reverse()
         return code, modes
+    def extendTo(self, size):
+        while len(self.operations) < size:
+            self.operations.append(0)
+    def getParameters(self, count, modes):
+        # 0 -> index
+        # 1 -> literal value
+        # 2 -> offset from relative base
+
+        result = []
+
+        for i in range(1, count+1):
+            val = self.operations[self.counter + i]
+            print val
+
+            if modes[i - 1] == 0:
+                val = self.operations[val]
+            elif modes[i - 1] == 1:
+                pass
+            elif modes[i - 1] == 2:
+                val = self.operations[val + self.relative_base]
+            result.append(val)
+
+        print result
+        return result
